@@ -14,6 +14,18 @@
 (defun variable-p (exp)
   (symbolp exp))
 
+;; quote
+
+(defun tagged-list-p (lst tag)
+  (equal (car lst) tag))
+
+(defun quoted-p (exp)
+  (tagged-list-p exp 'quote))
+
+(defun quoted-object (exp)
+  (assert (quoted-p exp))
+  (cdr exp))
+
 ;; application
 
 (defun application-p (exp)
@@ -54,6 +66,11 @@
 (defun extend-env (vars vals env)
   (cons (make-frame vars vals) env))
 
+;; apply
+
+(defun m-apply (func &rest args)
+  (apply func args))
+
 ;; eval
 
 (defun eval-each (lst env)
@@ -64,9 +81,12 @@
     ((self-eval-p exp) exp)
     ((variable-p exp)
      (lookup-variable-value exp env))
+    ((quoted-p exp)
+     (quoted-object exp))
+
     ((application-p exp)
-     (apply (m-eval (operator exp) env)
-            (eval-each (operands exp) env)))
+     (m-apply (m-eval (operator exp) env)
+              (eval-each (operands exp) env)))
     ))
 
 ;;--------------------
@@ -112,15 +132,16 @@
     (assert-equal '("v1-1" "v2-2") (eval-each '(e1-1 e2-2) env))))
 
 (define-test m-eval
-  (assert-equal 100 (m-eval 100 nil))
-  (assert-equal "abc" (m-eval "abc" nil))
   (let ((env (extend-env '(one two) '(1 2)
                          (extend-env '(+ - * /) (list #'+ #'- #'* #'/) +empty-env+))))
+    (assert-equal 100 (m-eval 100 env))
+    (assert-equal "abc" (m-eval "abc" env))
     (assert-equal 2 (m-eval 'two env))
     (assert-equal 6 (m-eval '(+ 1 2 3) env))
-    (assert-equal 9 (m-eval '(* (+ 1 2 ) (- 5 2)) env)))
-  )
+    (assert-equal 9 (m-eval '(* (+ 1 2 ) (- 5 2)) env))
+    (assert-equal '(123 abc "str") (m-eval '(quote 123 abc "str") env))))
 
 (defun test-all ()
   (setf *print-failures* t)
-  (run-tests :all))
+  (let ((result (run-tests :all)))
+    (print-errors result)))
