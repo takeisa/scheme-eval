@@ -7,6 +7,13 @@
 
 (in-package :sicp)
 
+;; utils
+
+(defun tagged-list-p (lst tag)
+  (equal (car lst) tag))
+
+;; self-eval
+
 (defun self-eval-p (exp)
   (or (numberp exp)
       (stringp exp)))
@@ -15,9 +22,6 @@
   (symbolp exp))
 
 ;; quote
-
-(defun tagged-list-p (lst tag)
-  (equal (car lst) tag))
 
 (defun quoted-p (exp)
   (tagged-list-p exp 'quote))
@@ -36,6 +40,23 @@
 
 (defun operands (exp)
   (cdr exp))
+
+(defun primitive-proc-p (exp)
+  (tagged-list-p exp :primitive-proc))
+
+(defun primitive-proc-names (lst)
+  (mapcar #'car lst))
+
+(defun primitive-proc-funcs (lst)
+  (mapcar #'(lambda (proc-bind) (list :primitive-proc (cdr proc-bind))) lst))
+
+(defun extend-primitive-proc-env (proc-assoc env)
+  (extend-env
+   (primitive-proc-names proc-assoc)
+   (primitive-proc-funcs proc-assoc) env))
+
+(defun primitive-proc-body (exp)
+  (cadr exp))
 
 ;; frame
 
@@ -68,8 +89,10 @@
 
 ;; apply
 
-(defun m-apply (func &rest args)
-  (apply func args))
+(defun m-apply (proc args)
+  (if (primitive-proc-p proc)
+      (apply (primitive-proc-body proc) args)
+      (error "not implemented")))
 
 ;; eval
 
@@ -88,6 +111,18 @@
      (m-apply (m-eval (operator exp) env)
               (eval-each (operands exp) env)))
     ))
+
+;; init env
+
+(defparameter *primitive-proc-assoc*
+  (list
+   (cons '+ #'+)
+   (cons '- #'-)
+   (cons '* #'*)
+   (cons '/ #'/)))
+
+(defun make-init-env ()
+  (extend-primitive-proc-env *primitive-proc-assoc* +empty-env+))
 
 ;;--------------------
 ;; test
@@ -133,7 +168,7 @@
 
 (define-test m-eval
   (let ((env (extend-env '(one two) '(1 2)
-                         (extend-env '(+ - * /) (list #'+ #'- #'* #'/) +empty-env+))))
+                         (make-init-env))))
     (assert-equal 100 (m-eval 100 env))
     (assert-equal "abc" (m-eval "abc" env))
     (assert-equal 2 (m-eval 'two env))
