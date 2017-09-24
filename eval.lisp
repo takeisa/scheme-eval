@@ -30,6 +30,35 @@
   (assert (quoted-p exp))
   (cdr exp))
 
+;; lambda
+
+(defun lambda-p (exp)
+  (tagged-list-p exp 'lambda))
+
+(defun lambda-params (exp)
+  (cadr exp))
+
+(defun lambda-body (exp)
+  (caddr exp))
+
+(defun make-closure (exp env)
+  (list :closure
+        (lambda-params exp)
+        (lambda-body exp)
+        env))
+
+(defun closure-p (exp)
+  (tagged-list-p exp :closure))
+
+(defun closure-params (exp)
+  (cadr exp))
+
+(defun closure-body (exp)
+  (caddr exp))
+
+(defun closure-env (exp)
+  (cadddr exp))
+
 ;; application
 
 (defun application-p (exp)
@@ -90,9 +119,16 @@
 ;; apply
 
 (defun m-apply (proc args)
-  (if (primitive-proc-p proc)
-      (apply (primitive-proc-body proc) args)
-      (error "not implemented")))
+  (cond
+    ((primitive-proc-p proc)
+     (apply (primitive-proc-body proc) args))
+    ((closure-p proc)
+     (let ((new-env (extend-env
+                     (closure-params proc)
+                     args
+                     (closure-env proc))))
+       (m-eval (closure-body proc) new-env)))
+    (error "not implemented")))
 
 ;; eval
 
@@ -106,7 +142,8 @@
      (lookup-variable-value exp env))
     ((quoted-p exp)
      (quoted-object exp))
-
+    ((lambda-p exp)
+     (make-closure exp env))
     ((application-p exp)
      (m-apply (m-eval (operator exp) env)
               (eval-each (operands exp) env)))
@@ -174,7 +211,8 @@
     (assert-equal 2 (m-eval 'two env))
     (assert-equal 6 (m-eval '(+ 1 2 3) env))
     (assert-equal 9 (m-eval '(* (+ 1 2 ) (- 5 2)) env))
-    (assert-equal '(123 abc "str") (m-eval '(quote 123 abc "str") env))))
+    (assert-equal '(123 abc "str") (m-eval '(quote 123 abc "str") env))
+    (assert-equal 5 (m-eval '((lambda (x y) (+ x y)) 2 3) env))))
 
 (defun test-all ()
   (setf *print-failures* t)
