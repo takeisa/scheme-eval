@@ -30,6 +30,27 @@
   (assert (quoted-p exp))
   (cdr exp))
 
+;; if
+
+(defun if-p (exp)
+  (tagged-list-p exp 'if))
+
+(defun if-predicate (exp)
+  (cadr exp))
+
+(defun if-consequence (exp)
+  (caddr exp))
+
+(defun if-alternative (exp)
+  (if (cadddr exp)
+      (cadddr exp)
+      'false))
+
+(defun eval-if (exp env)
+  (if (m-eval (if-predicate exp) env)
+      (m-eval (if-consequence exp) env)
+      (m-eval (if-alternative exp) env)))
+
 ;; lambda
 
 (defun lambda-p (exp)
@@ -116,6 +137,11 @@
 (defun extend-env (vars vals env)
   (cons (make-frame vars vals) env))
 
+(defun extend-env-with-assoc (var-val-assoc env)
+  (extend-env
+   (mapcar #'car var-val-assoc)
+   (mapcar #'cdr var-val-assoc) env))
+
 ;; apply
 
 (defun m-apply (proc args)
@@ -142,6 +168,8 @@
      (lookup-variable-value exp env))
     ((quoted-p exp)
      (quoted-object exp))
+    ((if-p exp)
+     (eval-if exp env))
     ((lambda-p exp)
      (make-closure exp env))
     ((application-p exp)
@@ -158,8 +186,14 @@
    (cons '* #'*)
    (cons '/ #'/)))
 
+(defparameter *var-val-assoc*
+  (list
+   (cons 'true t)
+   (cons 'false nil)))
+
 (defun make-init-env ()
-  (extend-primitive-proc-env *primitive-proc-assoc* +empty-env+))
+  (extend-env-with-assoc *var-val-assoc*
+                         (extend-primitive-proc-env *primitive-proc-assoc* +empty-env+)))
 
 ;;--------------------
 ;; test
@@ -212,7 +246,12 @@
     (assert-equal 6 (m-eval '(+ 1 2 3) env))
     (assert-equal 9 (m-eval '(* (+ 1 2 ) (- 5 2)) env))
     (assert-equal '(123 abc "str") (m-eval '(quote 123 abc "str") env))
-    (assert-equal 5 (m-eval '((lambda (x y) (+ x y)) 2 3) env))))
+    (assert-equal 5 (m-eval '((lambda (x y) (+ x y)) 2 3) env))
+    ;; if
+    (assert-equal "true" (m-eval '(if true "true" "false") env))
+    (assert-equal "false"(m-eval '(if false "true" "false") env))
+    (assert-equal nil (m-eval '(if false "true") env))
+    ))
 
 (defun test-all ()
   (setf *print-failures* t)
