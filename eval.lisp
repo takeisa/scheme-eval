@@ -287,9 +287,11 @@
     (assert-equal "true" (m-eval '(if true "true" "false") env))
     (assert-equal "false" (m-eval '(if false "true" "false") env))
     (assert-equal nil (m-eval '(if false "true") env))
+    ;; define
     (m-eval '(define hello "abcd") env)
     (assert-equal "abcd" (m-eval 'hello env))
     (m-eval '(define (add a b) (+ a b)) env)
+    (assert-equal 3 (m-eval '(+ 1 2) env))
     ))
 
 (defun test-all ()
