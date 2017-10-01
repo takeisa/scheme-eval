@@ -30,6 +30,36 @@
   (assert (quoted-p exp))
   (cdr exp))
 
+;; define
+
+(defun define-p (exp)
+  (tagged-list-p exp 'define))
+
+(defun define-var (exp)
+  (if (symbolp (cadr exp))
+      (cadr exp)
+      (caadr exp)))
+
+(defun make-lambda (args body)
+  (list 'lambda args body))
+
+;; ex: (define (foo arg1 arg2) body)
+(defun define-value (exp)
+  (if (symbolp (cadr exp))
+      (caddr exp)
+      (make-lambda (cdadr exp)
+                   (caddr exp))))
+
+(defun eval-define (exp env)
+  (let ((frame (first-frame env))
+        (var (define-var exp))
+        (val (define-value exp)))
+    (let ((var-val (assoc var frame)))
+      (when var-val
+        (error "already ~a variable defined." var))
+      (add-binding-to-frame var (m-eval val env) frame)
+      'ok)))
+
 ;; if
 
 (defun if-p (exp)
@@ -121,6 +151,10 @@
 (defun parent-env (env)
   (cdr env))
 
+(defun add-binding-to-frame (var val frame)
+  (setf (cdr frame) (cons (car frame) (cdr frame)))
+  (setf (car frame) (cons var val)))
+
 ;; env
 
 (defconstant +empty-env+ nil)
@@ -154,7 +188,7 @@
                      args
                      (closure-env proc))))
        (m-eval (closure-body proc) new-env)))
-    (error "not implemented")))
+    (t (error "not implemented"))))
 
 ;; eval
 
@@ -168,6 +202,8 @@
      (lookup-variable-value exp env))
     ((quoted-p exp)
      (quoted-object exp))
+    ((define-p exp)
+     (eval-define exp env))
     ((if-p exp)
      (eval-if exp env))
     ((lambda-p exp)
@@ -249,8 +285,11 @@
     (assert-equal 5 (m-eval '((lambda (x y) (+ x y)) 2 3) env))
     ;; if
     (assert-equal "true" (m-eval '(if true "true" "false") env))
-    (assert-equal "false"(m-eval '(if false "true" "false") env))
+    (assert-equal "false" (m-eval '(if false "true" "false") env))
     (assert-equal nil (m-eval '(if false "true") env))
+    (m-eval '(define hello "abcd") env)
+    (assert-equal "abcd" (m-eval 'hello env))
+    (m-eval '(define (add a b) (+ a b)) env)
     ))
 
 (defun test-all ()
