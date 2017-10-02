@@ -60,6 +60,27 @@
       (add-binding-to-frame var (m-eval val env) frame)
       'ok)))
 
+;; set!
+
+(defun set-p (exp)
+  (tagged-list-p exp 'set!))
+
+(defun set-var (exp)
+  (cadr exp))
+
+(defun set-value (exp)
+  (caddr exp))
+
+(defun eval-set (exp env)
+  (let ((frame (first-frame env))
+        (var (set-var exp))
+        (val (set-value exp)))
+    (let ((var-val (assoc var frame)))
+      (unless var-val
+        (error "~a variable undefined" var))
+      (set-binding-to-frame var val frame)
+      'ok)))
+
 ;; if
 
 (defun if-p (exp)
@@ -155,6 +176,10 @@
   (setf (cdr frame) (cons (car frame) (cdr frame)))
   (setf (car frame) (cons var val)))
 
+(defun set-binding-to-frame (var val frame)
+  (let ((var-val (assoc var frame)))
+    (rplacd var-val val)))
+
 ;; env
 
 (defconstant +empty-env+ nil)
@@ -204,6 +229,8 @@
      (quoted-object exp))
     ((define-p exp)
      (eval-define exp env))
+    ((set-p exp)
+     (eval-set exp env))
     ((if-p exp)
      (eval-if exp env))
     ((lambda-p exp)
@@ -292,6 +319,11 @@
     (assert-equal "abcd" (m-eval 'hello env))
     (m-eval '(define (add a b) (+ a b)) env)
     (assert-equal 3 (m-eval '(+ 1 2) env))
+    ;; set!
+    (m-eval '(define foo "foo") env)
+    (assert-equal "foo" (m-eval 'foo env))
+    (m-eval '(set! foo "foo2") env)
+    (assert-equal "foo2" (m-eval 'foo env))
     ))
 
 (defun test-all ()
