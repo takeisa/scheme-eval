@@ -57,6 +57,7 @@
     (let ((var-val (assoc var frame)))
       (when var-val
         (error "already ~a variable defined." var))
+      (format t "var=~a val=~a~%" var val)
       (add-binding-to-frame var (m-eval val env) frame)
       'ok)))
 
@@ -130,6 +131,22 @@
 
 (defun closure-env (exp)
   (cadddr exp))
+
+;; begin(sequence)
+
+(defun begin-p (exp)
+  (tagged-list-p exp 'begin))
+
+(defun begin-exps (exp)
+  (cdr exp))
+
+(defun eval-begin (exp env)
+  (let ((result))
+    (dolist (exp (begin-exps exp) result)
+      (setf result (m-eval exp env)))))
+
+(defun make-begin (exps)
+  (cons 'begin exps))
 
 ;; application
 
@@ -220,7 +237,7 @@
 (defun eval-each (lst env)
   (mapcar #'(lambda (item) (m-eval item env)) lst))
 
-(defun m-eval (exp env)
+(defun m-eval-aux (exp env)
   (cond
     ((self-eval-p exp) exp)
     ((variable-p exp)
@@ -235,10 +252,19 @@
      (eval-if exp env))
     ((lambda-p exp)
      (make-closure exp env))
+    ((begin-p exp)
+     (eval-begin exp env))
     ((application-p exp)
      (m-apply (m-eval (operator exp) env)
               (eval-each (operands exp) env)))
     ))
+
+(defun m-eval (exp env)
+  (format t "debug: exp=~a~%" exp)
+  (let ((result
+         (m-eval-aux exp env)))
+    (format t " -> ~a~%" result)
+    result))
 
 ;; init env
 
@@ -318,15 +344,25 @@
     (m-eval '(define hello "abcd") env)
     (assert-equal "abcd" (m-eval 'hello env))
     (m-eval '(define (add a b) (+ a b)) env)
-    (assert-equal 3 (m-eval '(+ 1 2) env))
+    (assert-equal 3 (m-eval '(add 1 2) env))
     ;; set!
     (m-eval '(define foo "foo") env)
     (assert-equal "foo" (m-eval 'foo env))
     (m-eval '(set! foo "foo2") env)
     (assert-equal "foo2" (m-eval 'foo env))
+    )
+  (let ((env (make-init-env)))
+    ;; begin
+    (m-eval '(begin
+              (define (add a b) (+ a b))
+              (define result (add 1 2))
+              (set! result (add result 3))) env)
+    (assert-equal 6 (m-eval 'result env))
     ))
 
 (defun test-all ()
   (setf *print-failures* t)
   (let ((result (run-tests :all)))
     (print-errors result)))
+
+(setf *print-circle* t)
