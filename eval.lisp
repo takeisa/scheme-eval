@@ -78,7 +78,7 @@
     (let ((var-val (assoc var frame)))
       (unless var-val
         (error "~a variable undefined" var))
-      (set-binding-to-frame var val frame)
+      (set-binding-to-frame var (m-eval val env) frame)
       'ok)))
 
 ;; if
